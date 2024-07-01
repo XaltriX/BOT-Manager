@@ -1,0 +1,49 @@
+Bot token: 7313233043:AAGDAwPi5b98QouE1_E4QG-7c0czbFAHitE, Name: JinnXfilter_bot, Username: jinnXfilter_bot
+Bot token: 7391275648:AAGat-YT2A4klt19QX6XzDlJ8LHN5HiQoO4, Name: KannadaMagaa, Username: KannadaMagaa_bot
+Bot token: 6747753059:AAF12MszFq52iSS2LnUy4hP3u7tVy71Lck8, Name: Pushpa Bot, Username: Pushpaa_Movie_Bot
+Bot token: 5729151120:AAFp_-ZIC5La8hURtNrGmJjWLbJ6aD3_pjQ, Name: ⋞Kᴀᴋᴀsʜɪ⋟, Username: File_StoreXZ_Bot
+Bot token: 7090116931:AAFiJrFbGc8cUMg3vA8fO-BilhQc1M4EqSQ, Name: Mina Ashiro, Username: MinaashiroBot
+Bot token: 7030833737:AAG3CI3k6H6DyxhsleyAovMJVowzBNFoZ-c, Name: ᴀɪ-ᴍᴏᴠɪᴇ-ꜰɪʟᴛᴇʀ-ʙᴏᴛ, Username: Ai_MovieFilter_BOT
+Bot token: 6955232343:AAEnLZnzrIJhNUAtHWzm58Hqit1xtZjr83o, Name: 𝐓𝐄𝐋𝐔𝐆𝐔 𝐌𝐀𝐂𝐇𝐀, Username: Telugumachabot
+Bot token: 7077262980:AAE9iZeMeWNkQ_aEIyOeDDHleBsN1pbFxec, Name: TCH FILES NEW, Username: TCH_FILES7Bot
+Bot token: 7002415163:AAGvcf4bAk8E8pIqQZKi2TdE8euVPEGOidE, Name: AJ_movies_bot, Username: AJ_movies_bot
+Bot token: 7201820992:AAGRW9S8Q56IWyKADGNaqkWNeyxUGKXf3hQ, Name: Mdisk Blast Bot, Username: Mbadvancedvipbot
+Bot token: 7172159049:AAHEZF6FPEwseSnQoQZ1uxcS2Cdsq_QgAYQ, Name: LPR Movie Provider, Username: LPR_Movie_Provider_Bot
+Bot token: 7403960233:AAEOliS0eLdq4iq8zMakYIf7r_2M69sgRdk, Name: Botbajj, Username: Bajj1bot
+Bot token: 7197503629:AAENswC8xqnxB-jVQl2209m9F0lFjLhKmGE, Name: Master, Username: Complex_Movie_bot
+Bot token: 5088657122:AAGXARfg6sSX1p1ge876jknkrJizwH959b4, Name: ..., Username: fi2li123robot
+Bot token: 6706981599:AAHC2gXWy_RlJyahAE41u8KwGPPHbLqwaRI, Name: Marcus Filter Bot V2, Username: Marcus_Filter_V3_bot
+Bot token: 6898644244:AAGZuIIuSIPVGMod1zprYiQA1GR8vNqaBe0, Name: My_Files, Username: My_Files_7bot
+Bot token: 6969502691:AAG7cbyJoGFjl5u8tdpdfYdczGdZiZ1y89U, Name: ᴍᴏᴠɪᴇ ꜱᴛᴀʀ ꜱᴇᴀʀᴄʜ, Username: Movie_Star_File_Search_Bot
+Bot token: 7065180942:AAGMmG7lZsNOWRVAcfUz--mhpD1bmFyARwU, Name: RgLinks_bot, Username: RgLinks_bot
+Bot token: 6366786954:AAGNglQLwqyr21lsVYm-P0ioySyOnD2SRZU, Name: Movie Search bot, Username: autofilterwithstream_bot
+Bot token: 6425089046:AAHLNDVmS_c1eTi12SI_vXZbLQacxja83NA, Name: ᴍᴠ ғᴏʀᴡᴀʀᴅ ʙᴏᴛ, Username: MV_Forward_bot
+Bot token: 7166227662:AAEwjY0YZnIo47cv1kbN5X3B81hytaewZsM, Name: Aniwatchbot, Username: Aniwatchzbot
+Bot token: 6950514128:AAGN6UZjVwNZUh2Ksqn_1W7H_XXw0MsTfNA, Name: The mith3, Username: Themith_bot
+Bot token: 5255660171:AAHIkPH-XZRtKhcdQy6XT6SBRvFEKAMByf8, Name: Sunny Leone ✨, Username: allmoviebot123bot
+Bot token: 7047568095:AAFAd_v1PwsCDwaFWn0ZnK9-3V930RN3Qjw, Name: SMK MOVIE BOT, Username: SMK_MOVIE_BOT
+Bot token: 6716469190:AAHhM-I5y-BN--voiGza-BSA4El7fB85fFY, Name: Movies Flix Bot, Username: Movies_Flix_Filterbot
+Bot token: 7002931685:AAFGLi1wKQ8ofG9-ihqkWwYPJWc5sYMufLA, Name: kam wala, Username: autossd_bot
+Bot token: 1863692421:AAHRQSViUPxY6nWuYu7uOFtQpZ4dPCPcn5c, Name: DH Uploader, Username: divashubbot
+Bot token: 7138703792:AAFLoY616HuDPZ9Hmz941wSMWYCWTwxYSmQ, Name: Movies - Series Bot, Username: MoviesSeriesMnTBot
+Bot token: 6691622758:AAGG7s8TlT_HCdzaQdpgWg691gXMZw68cJ8, Name: SEARCHENGINE 🔎, Username: se_filesrobot
+Bot token: 6904943595:AAHunQGzv5qa-cb18tFKBnc0Y8MOpzlvu1E, Name: jmfiles, Username: jmfilesbot
+Bot token: 6611039015:AAG0o5G_wXxdJlcTJ6rvPW_4W6y4M7r7gF4, Name: STAR FILTER BOT, Username: STARFILTER_BOT
+Bot token: 5469511581:AAFm7zWXohCipRoPS2UFV1cla0SYspEcdgQ, Name: Nayan😘, Username: nk2filterbot
+Bot token: 6950688402:AAE4g1B4CfoHOCjwJjWfeJURfIithLzRV8o, Name: FilterBot, Username: FilterJaat_Bot
+Bot token: 6977119622:AAHoSktLqe5WQ5JDvbJYnF6qDkTugLxnHHk, Name: RSS2_BOT, Username: RSS2sr_BOT
+Bot token: 6402389232:AAGZTN1Hd_CX4V6hHz_zcs99IOYLROcY_j8, Name: Kiran movies, Username: Kiran_711_bot
+Bot token: 6365222536:AAEwYCK2jNZsAUmb6IoMR0ZDgxx-YYP04j8, Name: IPopkorn Botz ⚡, Username: Ipopkorn0_bot
+Bot token: 1937771202:AAEQ2RO7hMiU1ojcRkbDVyfk85Ton994zBk, Name: test daryl, Username: CCautofilterbot
+Bot token: 6728514865:AAHmqcYsHFQyYwANLDiKSdMZWSvXI4akBck, Name: yuji, Username: yuji_filesbot
+Bot token: 6318429756:AAHKYzltAqO9K2pjG2739liar-4k_eBGOmU, Name: ShortURLsxyz, Username: Shorturlsxyzbot
+Bot token: 6706171324:AAG3ClVJKiQuRr4lh9ggKNINaghHjIyzCJg, Name: Cinema latino, Username: Mytvlatina_bot
+Bot token: 6776233446:AAGWmpBzm8O8Z-mYxGlbuQbs5ekelmxSDWU, Name: Auto filter, Username: Auto_Filter_A_2_Z_Bot
+Bot token: 6123215362:AAEdjf8Tj2an8mkHlYPIWGa_kxv4ElJAFbI, Name: Fast2.0, Username: FasttwoBot
+Bot token: 6926287675:AAHBOF8FCXVSi64-Zl6Mqa4RLPSYdcrQml8, Name: Modring® Movies, Username: Modring_x_bot
+Bot token: 6850092163:AAENu0vhQPwavCjy86wcTWHu7j_sULzrkVY, Name: DC Master search bot, Username: DCMasterbot
+Bot token: 6139751568:AAFBeqTQRe2-U-vhlfIlxGOp7HVpVzXzOpc, Name: ♠️ Mᴄ Fɪʟᴍs Bᴏᴛ ♠️, Username: McGroupfilms_bot
+Bot token: 6590082039:AAGWEMkuphepkyIrECQFGMTBAJ5VKXaBFMM, Name: Vαɴѕн Boт, Username: auto_fliter_bot
+Bot token: 6596758552:AAE9ZiW5BfFrJ7faVlHrXMAH6ck2_nOY9t8, Name: Djdj, Username: Djdkdjeiiebot
+Bot token: 6362301740:AAGCi3z-6zdAVj8NZFW2a9M0ZHHdQ4enhtI, Name: Professor, Username: fyfgyygg_bot
+Bot token: 6561093251:AAEY0qqb3Bv9geRASKlOF3xZsdiRKR5qcqE, Name: ALAS, Username: ALAS_NOW_BOT
