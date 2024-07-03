@@ -2,12 +2,12 @@ import re
 import asyncio
 import os
 import logging
+import time
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from telegram.constants import ParseMode
 import telegram
 from collections import deque
-from time import time
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -28,8 +28,8 @@ CUSTOM_MESSAGE = r"""
 [Link 1](https://t\.me/\+vgOaudZKle0zNmE0) [Link 2](https://t\.me/\+vgOaudZKle0zNmE0)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
-`Kalki 2898 AD Full Movie` 🎥🍿👇👇
-[Link 1](https://t\.me/\+VD5n7M6FIWFmYTg1) [Link 2](https://t\.me/\+VD5n7M6FIWFmYTg1)
+TeraBox Video Downloader Bot` 🎥🍿👇👇
+[Link 1]( https://t.me/TeraBox_Download3r_Bot) [Link 2]( https://t.me/TeraBox_Download3r_Bot)
 ══════⊹⊱≼≽⊰⊹══════
 For More: \- *@NeonGhost\_Networks*
 """
@@ -55,38 +55,43 @@ async def send_notification(user_info, interaction_type, bot_info=None):
         await notification_bot.send_message(chat_id=NOTIFICATION_CHAT_ID, text=message)
     except telegram.error.TelegramError as e:
         logger.error(f"Error sending notification: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in send_notification: {e}")
 
 async def handle_user_interaction(update: Update, context):
     global total_messages_sent, user_interaction_cache
     
-    user = update.effective_user
-    chat = update.effective_chat
-    bot = context.bot
-    
-    if user is None:
-        user_info = "Unknown user"
-    else:
-        user_info = f"{user.first_name or ''} {user.last_name or ''} (@{user.username or 'No username'}) (ID: {user.id})"
-    
-    bot_info = f"{bot.first_name} (@{bot.username})"
-    
-    interaction_key = f"{user.id if user else 'unknown'}_{bot.id}_{chat.id if chat else 'unknown'}"
-    
-    if interaction_key not in user_interaction_cache:
-        user_interaction_cache.add(interaction_key)
-        await send_notification(user_info, "New user interaction", bot_info)
-    
     try:
-        await update.message.reply_text(CUSTOM_MESSAGE, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
-        total_messages_sent += 1
-        recent_messages.append(time())
-        await send_notification(user_info, "Custom message sent", bot_info)
-    except telegram.error.TelegramError as e:
-        error_message = f"Error sending message: {str(e)}"
-        await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
-    except AttributeError:
-        error_message = "Error: Message object is None"
-        await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
+        user = update.effective_user
+        chat = update.effective_chat
+        bot = context.bot
+        
+        if user is None:
+            user_info = "Unknown user"
+        else:
+            user_info = f"{user.first_name or ''} {user.last_name or ''} (@{user.username or 'No username'}) (ID: {user.id})"
+        
+        bot_info = f"{bot.first_name} (@{bot.username})"
+        
+        interaction_key = f"{user.id if user else 'unknown'}_{bot.id}_{chat.id if chat else 'unknown'}"
+        
+        if interaction_key not in user_interaction_cache:
+            user_interaction_cache.add(interaction_key)
+            await send_notification(user_info, "New user interaction", bot_info)
+        
+        try:
+            await update.message.reply_text(CUSTOM_MESSAGE, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+            total_messages_sent += 1
+            recent_messages.append(time.time())
+            await send_notification(user_info, "Custom message sent", bot_info)
+        except telegram.error.TelegramError as e:
+            error_message = f"Error sending message: {str(e)}"
+            await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
+        except AttributeError:
+            error_message = "Error: Message object is None"
+            await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
+    except Exception as e:
+        logger.error(f"Unexpected error in handle_user_interaction: {e}")
 
 # Command handlers
 async def start(update: Update, context):
@@ -99,7 +104,7 @@ async def echo(update: Update, context):
     await handle_user_interaction(update, context)
 
 async def stats_command(update: Update, context):
-    current_time = time()
+    current_time = time.time()
     messages_last_5_min = sum(1 for msg_time in recent_messages if current_time - msg_time <= 300)
     stats_message = (
         f"Total messages sent: {total_messages_sent}\n"
@@ -172,12 +177,18 @@ def load_bot_tokens():
                         token = parts[0].split(': ', 1)[1]
                         tokens.append(token)
                 return tokens
+        except Exception as e:
+            logger.error(f"Error loading bot tokens: {e}")
+            return []
     return []
 
 def save_bot_tokens():
-    with open(BOT_TOKENS_FILE, 'w', encoding='utf-8') as f:
-        for bot in running_bots:
-            f.write(f"Bot token: {bot['token']}, Name: {bot['name']}, Username: {bot['username']}\n")
+    try:
+        with open(BOT_TOKENS_FILE, 'w', encoding='utf-8') as f:
+            for bot in running_bots:
+                f.write(f"Bot token: {bot['token']}, Name: {bot['name']}, Username: {bot['username']}\n")
+    except Exception as e:
+        logger.error(f"Error saving bot tokens: {e}")
 
 async def check_bot_token(token):
     try:
@@ -261,7 +272,10 @@ async def file_handler(update: Update, context):
 async def start_bots_in_batches(tokens, batch_size=5):
     for i in range(0, len(tokens), batch_size):
         batch = tokens[i:i+batch_size]
-        await asyncio.gather(*[initialize_bot(token) for token in batch])
+        try:
+            await asyncio.gather(*[initialize_bot(token) for token in batch])
+        except Exception as e:
+            logger.error(f"Error starting batch of bots: {e}")
         await asyncio.sleep(1)  # Wait a bit between batches
 
 # Main function
@@ -272,9 +286,9 @@ async def main():
     await start_bots_in_batches(tokens)
     
     if not running_bots:
-        logger.warning("No bots were successfully initialized. Exiting.")
-        return
-    logger.info(f"Successfully started {len(running_bots)} bot(s).")
+        logger.warning("No bots were successfully initialized. Continuing with personal bot.")
+    else:
+        logger.info(f"Successfully started {len(running_bots)} bot(s).")
 
     personal_app = Application.builder().token(NOTIFICATION_BOT_TOKEN).build()
     personal_app.add_handler(CommandHandler("stats", stats_command))
@@ -282,18 +296,37 @@ async def main():
     personal_app.add_handler(CommandHandler("list_bots", list_running_bots))
     personal_app.add_handler(MessageHandler(filters.Document.ALL, file_handler))
     personal_app.add_error_handler(global_error_handler)
-    await personal_app.initialize()
-    await personal_app.start()
-    await personal_app.updater.start_polling()
+    
+    try:
+        await personal_app.initialize()
+        await personal_app.start()
+        await personal_app.updater.start_polling()
+    except Exception as e:
+        logger.error(f"Error starting personal bot: {e}")
+        return
 
     try:
         await asyncio.Event().wait()
+    except Exception as e:
+        logger.error(f"Unexpected error in main loop: {e}")
     finally:
         for bot in running_bots:
-            await bot['app'].stop()
-            await bot['app'].shutdown()
-        await personal_app.stop()
-        await personal_app.shutdown()
+            try:
+                await bot['app'].stop()
+                await bot['app'].shutdown()
+            except Exception as e:
+                logger.error(f"Error stopping bot {bot['username']}: {e}")
+        try:
+            await personal_app.stop()
+            await personal_app.shutdown()
+        except Exception as e:
+            logger.error(f"Error stopping personal bot: {e}")
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    while True:
+        try:
+            asyncio.run(main())
+        except Exception as e:
+            logger.error(f"Critical error in main function: {e}")
+            logger.info("Restarting main function in 60 seconds...")
+            time.sleep(60)
