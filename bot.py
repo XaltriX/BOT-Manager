@@ -28,8 +28,8 @@ CUSTOM_MESSAGE = r"""
 [Link 1](https://t\.me/\+vgOaudZKle0zNmE0) [Link 2](https://t\.me/\+vgOaudZKle0zNmE0)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
-TeraBox Video Downloader Bot` 🎥🍿👇👇
-[Link 1]( https://t.me/TeraBox_Download3r_Bot) [Link 2]( https://t.me/TeraBox_Download3r_Bot)
+`TeraBox Video Downloader Bot` 🎥🍿👇👇
+[Link 1](https://t\.me/TeraBox\_Download3r\_Bot) [Link 2](https://t\.me/TeraBox\_Download3r\_Bot)
 ══════⊹⊱≼≽⊰⊹══════
 For More: \- *@NeonGhost\_Networks*
 """
@@ -321,6 +321,8 @@ async def main():
             await personal_app.shutdown()
         except Exception as e:
             logger.error(f"Error stopping personal bot: {e}")
+
+# ... (all the previous code remains the same)
 
 if __name__ == '__main__':
     while True:
