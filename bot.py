@@ -4,11 +4,11 @@ import os
 import logging
 import time
 from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 import telegram
 from collections import deque
-from telegram.error import RetryAfter, Conflict
+from telegram.error import RetryAfter, Conflict, NetworkError, TelegramError
 import aiofiles
 import aiofiles.os
 
@@ -62,7 +62,7 @@ async def send_notification(user_info, interaction_type, bot_info=None):
     except Exception as e:
         logger.error(f"Unexpected error in send_notification: {e}")
 
-async def handle_user_interaction(update: Update, context):
+async def handle_user_interaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global total_messages_sent, user_interaction_cache
     
     try:
@@ -102,16 +102,16 @@ async def handle_user_interaction(update: Update, context):
         logger.error(f"Unexpected error in handle_user_interaction: {e}")
 
 # Command handlers
-async def start(update: Update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await handle_user_interaction(update, context)
     user_info = f"{update.effective_user.first_name} {update.effective_user.last_name or ''} (@{update.effective_user.username or 'No username'}) (ID: {update.effective_user.id})"
     bot_info = f"{context.bot.first_name} (@{context.bot.username})"
     await send_notification(user_info, "Start command", bot_info)
 
-async def echo(update: Update, context):
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await handle_user_interaction(update, context)
 
-async def stats_command(update: Update, context):
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_time = time.time()
     messages_last_5_min = sum(1 for msg_time in recent_messages if current_time - msg_time <= 300)
     stats_message = (
@@ -121,7 +121,7 @@ async def stats_command(update: Update, context):
     )
     await update.message.reply_text(stats_message)
 
-async def add_token_file(update: Update, context):
+async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not update.message.reply_to_message.document:
         await update.message.reply_text("Please reply to a document message containing the bot tokens.")
         return
@@ -146,11 +146,11 @@ async def add_token_file(update: Update, context):
                 await status_message.edit_text(f"Skipped existing bot. Processing token {i+1}/{len(tokens)}...")
         
         await save_bot_tokens()
-        await status_message.edit_text(f"Finished! Successfully added {new_bots} new bots from the file.")
+        await status_message.edit_text(f"Finished! Successfully added {new_bots} new bots from the file and saved to {BOT_TOKENS_FILE}.")
     except Exception as e:
         await update.message.reply_text(f"Failed to add tokens from the file: {str(e)}")
 
-async def list_running_bots(update: Update, context):
+async def list_running_bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not running_bots:
         await update.message.reply_text("No bots are currently running.")
         return
@@ -161,7 +161,11 @@ async def list_running_bots(update: Update, context):
         bot_list += f"Username: @{bot['username']}\n"
         bot_list += f"Token: {bot['token'][:10]}...\n\n"
     
-    await update.message.reply_text(bot_list)
+    if len(bot_list) > 4096:
+        for i in range(0, len(bot_list), 4096):
+            await update.message.reply_text(bot_list[i:i+4096])
+    else:
+        await update.message.reply_text(bot_list)
 
 # Utility functions
 async def load_bot_tokens():
@@ -197,6 +201,7 @@ async def save_bot_tokens():
         async with aiofiles.open(BOT_TOKENS_FILE, 'w', encoding='utf-8') as f:
             for bot in running_bots:
                 await f.write(f"Bot token: {bot['token']}, Name: {bot['name']}, Username: {bot['username']}\n")
+        logger.info(f"Saved {len(running_bots)} bot tokens to {BOT_TOKENS_FILE}")
     except Exception as e:
         logger.error(f"Error saving bot tokens: {e}")
 
@@ -205,10 +210,7 @@ async def check_bot_token(token):
         bot = Bot(token)
         await bot.get_me()
         return True
-    except telegram.error.InvalidToken:
-        logger.error(f"Invalid token: {token[:10]}...")
-        return False
-    except Exception as e:
+    except TelegramError as e:
         logger.error(f"Error checking token {token[:10]}...: {str(e)}")
         return False
 
@@ -230,7 +232,7 @@ async def initialize_bot(token):
         try:
             await app.initialize()
             await app.start()
-            await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+            await app.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
         except telegram.error.TelegramError as e:
             logger.error(f"Telegram error while initializing bot: {e}")
             return None
@@ -252,7 +254,7 @@ async def initialize_bot(token):
     return None
 
 # Error handlers
-async def handle_flood_wait(update: Update, context: CallbackContext):
+async def handle_flood_wait(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         retry_after = int(context.error.retry_after)
         logger.warning(f"Flood wait error. Retrying after {retry_after} seconds.")
@@ -261,35 +263,22 @@ async def handle_flood_wait(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(f"Error handling flood wait: {e}")
 
-async def global_error_handler(update: Update, context: CallbackContext) -> None:
+async def global_error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     error = context.error
     try:
         raise error
-    except telegram.error.Unauthorized:
-        if "bot was blocked by the user" in str(error):
-            logger.warning(f"Bot was blocked by user: {update.effective_user.id if update.effective_user else 'Unknown'}")
-        else:
-            logger.error(f"Unauthorized error: {error}")
-    except telegram.error.BadRequest:
-        logger.error(f"Bad request: {error}")
-    except telegram.error.TimedOut:
-        logger.error(f"Timed out: {error}")
-    except telegram.error.NetworkError:
-        logger.error(f"Network error: {error}")
-    except AttributeError:
-        logger.error(f"Attribute error: {error}")
+    except TelegramError as e:
+        logger.error(f"Telegram error: {e}")
     except RetryAfter as e:
         await handle_flood_wait(update, context)
-    except Conflict:
-        logger.error("Conflict: Another instance of the bot is already running.")
     except Exception as e:
-        logger.error(f"Unexpected error: {error}")
+        logger.error(f"Unexpected error: {e}")
     
     # Notify about the error
     await send_notification("System", f"Global error: {str(error)}")
 
 # File handler
-async def file_handler(update: Update, context):
+async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.document:
         file_id = update.message.document.file_id
         new_file = await context.bot.get_file(file_id)
@@ -306,9 +295,36 @@ async def start_bots_in_batches(tokens, batch_size=5):
             await asyncio.gather(*[initialize_bot(token) for token in batch])
         except Exception as e:
             logger.error(f"Error starting batch of bots: {e}")
-        await asyncio.sleep(1)  # Wait a bit between batches
 
-# Main function
+async def reconnect_bot(bot):
+    try:
+        await bot['app'].stop()
+        await bot['app'].shutdown()
+    except Exception as e:
+        logger.error(f"Error stopping bot {bot['username']}: {e}")
+    
+    try:
+        new_app = await initialize_bot(bot['token'])
+        if new_app:
+            bot['app'] = new_app
+            logger.info(f"Successfully reconnected bot {bot['username']}")
+        else:
+            logger.error(f"Failed to reconnect bot {bot['username']}")
+    except Exception as e:
+        logger.error(f"Error reconnecting bot {bot['username']}: {e}")
+
+async def check_and_reconnect_bots():
+    while True:
+        for bot in running_bots:
+            try:
+                await bot['app'].bot.get_me()
+            except NetworkError:
+                logger.warning(f"Bot {bot['username']} seems to be disconnected. Attempting to reconnect...")
+                await reconnect_bot(bot)
+            except Exception as e:
+                logger.error(f"Error checking bot {bot['username']}: {e}")
+        await asyncio.sleep(300)  # Check every 5 minutes
+
 async def main():
     global running_bots
     tokens = await load_bot_tokens()
@@ -330,13 +346,17 @@ async def main():
     try:
         await personal_app.initialize()
         await personal_app.start()
-        await personal_app.updater.start_polling()
+        await personal_app.updater.start_polling(drop_pending_updates=True)
     except Exception as e:
         logger.error(f"Error starting personal bot: {e}")
         return
 
+    # Start the bot checking and reconnection task
+    asyncio.create_task(check_and_reconnect_bots())
+
     try:
-        await asyncio.Event().wait()
+        while True:
+            await asyncio.sleep(60)
     except Exception as e:
         logger.error(f"Unexpected error in main loop: {e}")
     finally:
