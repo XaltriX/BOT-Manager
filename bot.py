@@ -11,6 +11,8 @@ from collections import deque
 from telegram.error import RetryAfter, Conflict, NetworkError, TelegramError
 import aiofiles
 import aiofiles.os
+import json
+import csv
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -49,6 +51,31 @@ uploaded_files = {}
 user_interaction_cache = set()
 bot_applications = {}
 
+# Custom RateLimiter implementation
+class RateLimiter:
+    def __init__(self, rate: int, per: float):
+        self.rate = rate
+        self.per = per
+        self.allowance = rate
+        self.last_check = time.time()
+        self.lock = asyncio.Lock()
+
+    async def acquire(self):
+        async with self.lock:
+            now = time.time()
+            time_passed = now - self.last_check
+            self.last_check = now
+            self.allowance += time_passed * (self.rate / self.per)
+            if self.allowance > self.rate:
+                self.allowance = self.rate
+            if self.allowance < 1:
+                return False
+            self.allowance -= 1
+            return True
+
+# Add rate limiter
+rate_limiter = RateLimiter(rate=20, per=60)  # 20 messages per minute
+
 # Helper functions
 async def send_notification(user_info, interaction_type, bot_info=None):
     notification_bot = Bot(NOTIFICATION_BOT_TOKEN)
@@ -68,6 +95,11 @@ async def handle_user_interaction(update: Update, context: ContextTypes.DEFAULT_
     try:
         if update.message is None:
             logger.error("Error: Message object is None")
+            return
+
+        # Apply rate limiting
+        if not await rate_limiter.acquire():
+            logger.warning("Rate limit exceeded. Skipping message.")
             return
 
         user = update.effective_user
@@ -125,11 +157,43 @@ async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not update.message.reply_to_message.document:
         await update.message.reply_text("Please reply to a document message containing the bot tokens.")
         return
+    
     file_id = update.message.reply_to_message.document.file_id
     file = await context.bot.get_file(file_id)
+    
     try:
         downloaded_file = await file.download_as_bytearray()
-        tokens = re.findall(r'Bot token: (\d+:[A-Za-z0-9_-]+)', downloaded_file.decode('utf-8'))
+        file_content = downloaded_file.decode('utf-8')
+        
+        # Extract tokens using various methods
+        tokens = set()
+        
+        # Method 1: Regular expression for standard bot token format
+        tokens.update(re.findall(r'\b\d+:[A-Za-z0-9_-]{35}\b', file_content))
+        
+        # Method 2: Look for "bot token" or similar phrases
+        tokens.update(re.findall(r'(?:bot token|token)[:=]\s*([A-Za-z0-9:_-]{45,})', file_content, re.IGNORECASE))
+        
+        # Method 3: Try parsing as JSON
+        try:
+            json_data = json.loads(file_content)
+            if isinstance(json_data, dict):
+                tokens.update(extract_tokens_from_dict(json_data))
+            elif isinstance(json_data, list):
+                for item in json_data:
+                    if isinstance(item, dict):
+                        tokens.update(extract_tokens_from_dict(item))
+        except json.JSONDecodeError:
+            pass
+        
+        # Method 4: Try parsing as CSV
+        try:
+            csv_reader = csv.reader(file_content.splitlines())
+            for row in csv_reader:
+                tokens.update(token for token in row if re.match(r'\d+:[A-Za-z0-9_-]{35}', token))
+        except csv.Error:
+            pass
+        
         if not tokens:
             await update.message.reply_text("No valid tokens found in the provided file.")
             return
@@ -149,6 +213,15 @@ async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_message.edit_text(f"Finished! Successfully added {new_bots} new bots from the file and saved to {BOT_TOKENS_FILE}.")
     except Exception as e:
         await update.message.reply_text(f"Failed to add tokens from the file: {str(e)}")
+
+def extract_tokens_from_dict(data):
+    tokens = set()
+    for key, value in data.items():
+        if isinstance(value, str) and re.match(r'\d+:[A-Za-z0-9_-]{35}', value):
+            tokens.add(value)
+        elif isinstance(value, (dict, list)):
+            tokens.update(extract_tokens_from_dict(value))
+    return tokens
 
 async def list_running_bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not running_bots:
@@ -249,8 +322,7 @@ async def initialize_bot(token):
         return app
     except Exception as e:
         logger.error(f"Error initializing bot with token {token[:10]}...: {str(e)}")
-    
-    await asyncio.sleep(0.5)  # Reduced delay to 0.5 seconds
+        await asyncio.sleep(0.5)  # Reduced delay to 0.5 seconds
     return None
 
 # Error handlers
@@ -315,15 +387,21 @@ async def reconnect_bot(bot):
 
 async def check_and_reconnect_bots():
     while True:
+        tasks = []
         for bot in running_bots:
-            try:
-                await bot['app'].bot.get_me()
-            except NetworkError:
-                logger.warning(f"Bot {bot['username']} seems to be disconnected. Attempting to reconnect...")
-                await reconnect_bot(bot)
-            except Exception as e:
-                logger.error(f"Error checking bot {bot['username']}: {e}")
+            tasks.append(asyncio.create_task(check_and_reconnect_bot(bot)))
+        
+        await asyncio.gather(*tasks)
         await asyncio.sleep(300)  # Check every 5 minutes
+
+async def check_and_reconnect_bot(bot):
+    try:
+        await bot['app'].bot.get_me()
+    except NetworkError:
+        logger.warning(f"Bot {bot['username']} seems to be disconnected. Attempting to reconnect...")
+        await reconnect_bot(bot)
+    except Exception as e:
+        logger.error(f"Error checking bot {bot['username']}: {e}")
 
 async def main():
     global running_bots
