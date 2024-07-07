@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 CUSTOM_MESSAGE = r"""
 ══════⊹⊱≼≽⊰⊹══════
 *@NeonGhost\_Networks* `Search & Download Your Favourite Movies` 👇👇🆓
-[Link 1](https://t\.me/\+6YAYymxzoqk5YmNl) [Link 2](https://t\.me/\+6YAYymxzoqk5YmNl)
+[Link 1](https://t.me/+0M4cL9_CsndiNjFk) [Link 2](https://t.me/+0M4cL9_CsndiNjFk)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
-`Leak Viral Video MMS OYO` 🚨👇👇🆓
+`Leak Viral Video MMS OYO P0rn ` 🚨👇👇🆓
 [Link 1](https://t\.me/\+XNvgEn\-PVqE1ZmU8) [Link 2](https://t\.me/\+XNvgEn\-PVqE1ZmU8)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
