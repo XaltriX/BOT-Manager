@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 CUSTOM_MESSAGE = r"""
 ══════⊹⊱≼≽⊰⊹══════
 *@NeonGhost\_Networks* `Search & Download Your Favourite Movies` 👇👇🆓
-[Link 1](https://t.me/+0M4cL9_CsndiNjFk) [Link 2](https://t.me/+0M4cL9_CsndiNjFk)
+[Link 1](https://t.me/+nwrDN5k69ow0MWRl) [Link 2](https://t.me/+nwrDN5k69ow0MWRl)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
 `Leak Viral Video MMS OYO P0rn ` 🚨👇👇🆓
@@ -281,11 +281,11 @@ async def save_bot_tokens():
 async def check_bot_token(token):
     try:
         bot = Bot(token)
-        await bot.get_me()
-        return True
+        bot_info = await bot.get_me()
+        return True, bot_info
     except TelegramError as e:
         logger.error(f"Error checking token {token[:10]}...: {str(e)}")
-        return False
+        return False, None
 
 async def initialize_bot(token):
     global running_bots, bot_applications
@@ -294,7 +294,8 @@ async def initialize_bot(token):
             logger.info(f"Bot with token {token[:10]}... is already running.")
             return bot_applications[token]
 
-        if not await check_bot_token(token):
+        is_valid, bot_info = await check_bot_token(token)
+        if not is_valid:
             return None
         
         app = Application.builder().token(token).build()
@@ -310,7 +311,6 @@ async def initialize_bot(token):
             logger.error(f"Telegram error while initializing bot: {e}")
             return None
         
-        bot_info = await app.bot.get_me()
         bot_applications[token] = app
         running_bots.append({
             'token': token,
@@ -392,16 +392,21 @@ async def check_and_reconnect_bots():
             tasks.append(asyncio.create_task(check_and_reconnect_bot(bot)))
         
         await asyncio.gather(*tasks)
-        await asyncio.sleep(300)  # Check every 5 minutes
+        await asyncio.sleep(60)  # Check every minute
 
 async def check_and_reconnect_bot(bot):
     try:
         await bot['app'].bot.get_me()
-    except NetworkError:
-        logger.warning(f"Bot {bot['username']} seems to be disconnected. Attempting to reconnect...")
+    except (NetworkError, TelegramError) as e:
+        logger.warning(f"Bot {bot['username']} seems to be disconnected. Error: {e}. Attempting to reconnect...")
         await reconnect_bot(bot)
     except Exception as e:
         logger.error(f"Error checking bot {bot['username']}: {e}")
+
+def global_exception_handler(loop, context):
+    exception = context.get('exception', context['message'])
+    logger.error(f"Unhandled exception: {exception}")
+    logger.error(f"Exception context: {context}")
 
 async def main():
     global running_bots
@@ -429,15 +434,26 @@ async def main():
         logger.error(f"Error starting personal bot: {e}")
         return
 
+    # Set up the global exception handler
+    asyncio.get_event_loop().set_exception_handler(global_exception_handler)
+
     # Start the bot checking and reconnection task
-    asyncio.create_task(check_and_reconnect_bots())
+    check_task = asyncio.create_task(check_and_reconnect_bots())
 
     try:
         while True:
             await asyncio.sleep(60)
+            if not check_task.done():
+                logger.info("Bot checking task is running")
+            else:
+                logger.error("Bot checking task has stopped unexpectedly")
+                check_task = asyncio.create_task(check_and_reconnect_bots())
+    except asyncio.CancelledError:
+        logger.info("Main loop was cancelled")
     except Exception as e:
         logger.error(f"Unexpected error in main loop: {e}")
     finally:
+        check_task.cancel()
         for bot in running_bots:
             try:
                 await bot['app'].stop()
