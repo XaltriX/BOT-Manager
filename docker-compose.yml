@@ -1,0 +1,8 @@
+version: '3'
+services:
+  telegram-bot:
+    build: .
+    restart: always
+    volumes:
+      - ./bot_tokens.txt:/app/bot_tokens.txt
+      - ./logs:/app/logs
