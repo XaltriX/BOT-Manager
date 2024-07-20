@@ -13,6 +13,7 @@ import aiofiles
 import aiofiles.os
 import json
 import csv
+import psutil
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -21,19 +22,19 @@ logger = logging.getLogger(__name__)
 # Constants
 CUSTOM_MESSAGE = r"""
 ══════⊹⊱≼≽⊰⊹══════
-*@NeonGhost\_Networks* `Search & Download Your Favourite Movies` 👇👇🆓
+*@NeonGhost_Networks* Search & Download Your Favourite Movies 👇👇🆓
 [Link 1](https://t.me/+nwrDN5k69ow0MWRl) [Link 2](https://t.me/+nwrDN5k69ow0MWRl)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
-`Leak Viral Video MMS OYO P0rn ` 🚨👇👇🆓
+Leak Viral Video MMS OYO P0rn 🚨👇👇🆓
 [Link 1](https://t\.me/\+XNvgEn\-PVqE1ZmU8) [Link 2](https://t\.me/\+XNvgEn\-PVqE1ZmU8)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
-`TeraBox Viral Video Links`🔗🍑👇👇
+TeraBox Viral Video Links🔗🍑👇👇
 [Link 1](https://t\.me/\+vgOaudZKle0zNmE0) [Link 2](https://t\.me/\+vgOaudZKle0zNmE0)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
-`TeraBox Video Downloader Bot` 🎥🍿👇👇
+TeraBox Video Downloader Bot 🎥🍿👇👇
 [Link 1](https://t\.me/TeraBox\_Download3r\_Bot) [Link 2](https://t\.me/TeraBox\_Download3r\_Bot)
 ══════⊹⊱≼≽⊰⊹══════
 For More: \- *@NeonGhost\_Networks*
@@ -47,7 +48,6 @@ BOT_TOKENS_FILE = 'bot_tokens.txt'
 total_messages_sent = 0
 running_bots = []
 recent_messages = deque(maxlen=1000)
-uploaded_files = {}
 user_interaction_cache = set()
 bot_applications = {}
 
@@ -74,7 +74,7 @@ class RateLimiter:
             return True
 
 # Add rate limiter
-rate_limiter = RateLimiter(rate=20, per=60)  # 20 messages per minute
+rate_limiter = RateLimiter(rate=30, per=60)  # 30 messages per minute
 
 # Helper functions
 async def send_notification(user_info, interaction_type, bot_info=None):
@@ -123,12 +123,14 @@ async def handle_user_interaction(update: Update, context: ContextTypes.DEFAULT_
             await update.message.reply_text(CUSTOM_MESSAGE, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
             total_messages_sent += 1
             recent_messages.append(time.time())
-            await send_notification(user_info, "Custom message sent", bot_info)
+            logger.info(f"Message sent by {bot_info} to {user_info}")
         except telegram.error.TelegramError as e:
             error_message = f"Error sending message: {str(e)}"
+            logger.error(f"TelegramError: {error_message}")
             await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
         except AttributeError:
             error_message = "Error: Message object is None"
+            logger.error(f"AttributeError: {error_message}")
             await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
     except Exception as e:
         logger.error(f"Unexpected error in handle_user_interaction: {e}")
@@ -146,82 +148,16 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_time = time.time()
     messages_last_5_min = sum(1 for msg_time in recent_messages if current_time - msg_time <= 300)
+    cpu_usage = psutil.cpu_percent()
+    memory_usage = psutil.virtual_memory().percent
     stats_message = (
         f"Total messages sent: {total_messages_sent}\n"
         f"Messages sent in last 5 minutes: {messages_last_5_min}\n"
-        f"Total bots running: {len(running_bots)}"
+        f"Total bots running: {len(running_bots)}\n"
+        f"CPU Usage: {cpu_usage}%\n"
+        f"Memory Usage: {memory_usage}%"
     )
     await update.message.reply_text(stats_message)
-
-async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.reply_to_message or not update.message.reply_to_message.document:
-        await update.message.reply_text("Please reply to a document message containing the bot tokens.")
-        return
-    
-    file_id = update.message.reply_to_message.document.file_id
-    file = await context.bot.get_file(file_id)
-    
-    try:
-        downloaded_file = await file.download_as_bytearray()
-        file_content = downloaded_file.decode('utf-8')
-        
-        # Extract tokens using various methods
-        tokens = set()
-        
-        # Method 1: Regular expression for standard bot token format
-        tokens.update(re.findall(r'\b\d+:[A-Za-z0-9_-]{35}\b', file_content))
-        
-        # Method 2: Look for "bot token" or similar phrases
-        tokens.update(re.findall(r'(?:bot token|token)[:=]\s*([A-Za-z0-9:_-]{45,})', file_content, re.IGNORECASE))
-        
-        # Method 3: Try parsing as JSON
-        try:
-            json_data = json.loads(file_content)
-            if isinstance(json_data, dict):
-                tokens.update(extract_tokens_from_dict(json_data))
-            elif isinstance(json_data, list):
-                for item in json_data:
-                    if isinstance(item, dict):
-                        tokens.update(extract_tokens_from_dict(item))
-        except json.JSONDecodeError:
-            pass
-        
-        # Method 4: Try parsing as CSV
-        try:
-            csv_reader = csv.reader(file_content.splitlines())
-            for row in csv_reader:
-                tokens.update(token for token in row if re.match(r'\d+:[A-Za-z0-9_-]{35}', token))
-        except csv.Error:
-            pass
-        
-        if not tokens:
-            await update.message.reply_text("No valid tokens found in the provided file.")
-            return
-        
-        status_message = await update.message.reply_text("Starting to add new bots...")
-        new_bots = 0
-        for i, token in enumerate(tokens):
-            if token not in [bot['token'] for bot in running_bots]:
-                bot = await initialize_bot(token)
-                if bot:
-                    new_bots += 1
-                    await status_message.edit_text(f"Added {new_bots} new bot(s). Processing token {i+1}/{len(tokens)}...")
-            else:
-                await status_message.edit_text(f"Skipped existing bot. Processing token {i+1}/{len(tokens)}...")
-        
-        await save_bot_tokens()
-        await status_message.edit_text(f"Finished! Successfully added {new_bots} new bots from the file and saved to {BOT_TOKENS_FILE}.")
-    except Exception as e:
-        await update.message.reply_text(f"Failed to add tokens from the file: {str(e)}")
-
-def extract_tokens_from_dict(data):
-    tokens = set()
-    for key, value in data.items():
-        if isinstance(value, str) and re.match(r'\d+:[A-Za-z0-9_-]{35}', value):
-            tokens.add(value)
-        elif isinstance(value, (dict, list)):
-            tokens.update(extract_tokens_from_dict(value))
-    return tokens
 
 async def list_running_bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not running_bots:
@@ -239,6 +175,17 @@ async def list_running_bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(bot_list[i:i+4096])
     else:
         await update.message.reply_text(bot_list)
+
+async def status_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    status_message = "Bot Status:\n\n"
+    for bot in running_bots:
+        try:
+            await bot['app'].bot.get_me()
+            status = "Online"
+        except TelegramError:
+            status = "Offline"
+        status_message += f"{bot['name']} (@{bot['username']}): {status}\n"
+    await update.message.reply_text(status_message)
 
 # Utility functions
 async def load_bot_tokens():
@@ -349,17 +296,6 @@ async def global_error_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     # Notify about the error
     await send_notification("System", f"Global error: {str(error)}")
 
-# File handler
-async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.document:
-        file_id = update.message.document.file_id
-        new_file = await context.bot.get_file(file_id)
-        file_path = os.path.join("uploaded_files", update.message.document.file_name)
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        await new_file.download(file_path)
-        uploaded_files[update.message.message_id] = file_path
-        await update.message.reply_text(f"File {update.message.document.file_name} uploaded. Reply with /add_token_file to add tokens from this file.")
-
 async def start_bots_in_batches(tokens, batch_size=5):
     for i in range(0, len(tokens), batch_size):
         batch = tokens[i:i+batch_size]
@@ -392,7 +328,7 @@ async def check_and_reconnect_bots():
             tasks.append(asyncio.create_task(check_and_reconnect_bot(bot)))
         
         await asyncio.gather(*tasks)
-        await asyncio.sleep(60)  # Check every minute
+        await asyncio.sleep(30)  # Check every 30 seconds
 
 async def check_and_reconnect_bot(bot):
     try:
@@ -421,9 +357,8 @@ async def main():
 
     personal_app = Application.builder().token(NOTIFICATION_BOT_TOKEN).build()
     personal_app.add_handler(CommandHandler("stats", stats_command))
-    personal_app.add_handler(CommandHandler("add_token_file", add_token_file))
     personal_app.add_handler(CommandHandler("list_bots", list_running_bots))
-    personal_app.add_handler(MessageHandler(filters.Document.ALL, file_handler))
+    personal_app.add_handler(CommandHandler("status", status_check))
     personal_app.add_error_handler(global_error_handler)
     
     try:
