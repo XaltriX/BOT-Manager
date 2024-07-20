@@ -10,3 +10,5 @@ h11<0.15,>=0.13
 typing-extensions
 exceptiongroup
 aiofiles
+psutil
+python-dotenv
