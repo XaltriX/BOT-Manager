@@ -14,6 +14,9 @@ import aiofiles.os
 import json
 import csv
 import psutil
+import gc
+import sys
+import resource
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -22,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Constants
 CUSTOM_MESSAGE = r"""
 ══════⊹⊱≼≽⊰⊹══════
-*@NeonGhost_Networks* Search & Download Your Favourite Movies 👇👇🆓
+*@NeonGhost\_Networks* Search & Download Your Favourite Movies 👇👇🆓
 [Link 1](https://t.me/+nwrDN5k69ow0MWRl) [Link 2](https://t.me/+nwrDN5k69ow0MWRl)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
@@ -40,8 +43,8 @@ TeraBox Video Downloader Bot 🎥🍿👇👇
 For More: \- *@NeonGhost\_Networks*
 """
 
-NOTIFICATION_BOT_TOKEN = '6836105234:AAFYHYLpQrecJGMVIRJHraGnHTbcON3pxxU'
-NOTIFICATION_CHAT_ID = '-1002177330851'
+NOTIFICATION_BOT_TOKEN = 'YOUR_BOT_TOKEN'
+NOTIFICATION_CHAT_ID = 'YOUR_CHAT_ID'
 BOT_TOKENS_FILE = 'bot_tokens.txt'
 
 # Global variables
@@ -124,14 +127,18 @@ async def handle_user_interaction(update: Update, context: ContextTypes.DEFAULT_
             total_messages_sent += 1
             recent_messages.append(time.time())
             logger.info(f"Message sent by {bot_info} to {user_info}")
-        except telegram.error.TelegramError as e:
+        except telegram.error.BadRequest as e:
             error_message = f"Error sending message: {str(e)}"
-            logger.error(f"TelegramError: {error_message}")
+            logger.error(f"BadRequest: {error_message}")
             await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
         except AttributeError:
             error_message = "Error: Message object is None"
             logger.error(f"AttributeError: {error_message}")
             await send_notification(user_info, "Error", f"{bot_info}\n{error_message}")
+        
+        # Call memory management function every 1000 messages
+        if total_messages_sent % 1000 == 0:
+            await free_cache_memory()
     except Exception as e:
         logger.error(f"Unexpected error in handle_user_interaction: {e}")
 
@@ -187,40 +194,59 @@ async def status_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status_message += f"{bot['name']} (@{bot['username']}): {status}\n"
     await update.message.reply_text(status_message)
 
+async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.document is None:
+        await update.message.reply_text("Please upload a text file containing bot tokens.")
+        return
+
+    file = await context.bot.get_file(update.message.document.file_id)
+    
+    try:
+        async with aiofiles.tempfile.NamedTemporaryFile(mode='wb', delete=False) as temp_file:
+            await file.download_to_memory(temp_file)
+            temp_file_path = temp_file.name
+
+        new_tokens = []
+        async with aiofiles.open(temp_file_path, 'r') as f:
+            content = await f.read()
+            new_tokens = [line.strip() for line in content.split('\n') if line.strip()]
+
+        await aiofiles.os.remove(temp_file_path)
+
+        if not new_tokens:
+            await update.message.reply_text("No valid tokens found in the file.")
+            return
+
+        added_count = 0
+        for token in new_tokens:
+            if token not in [bot['token'] for bot in running_bots]:
+                app = await initialize_bot(token)
+                if app:
+                    added_count += 1
+
+        await save_bot_tokens()
+        
+        await update.message.reply_text(f"Successfully added and started {added_count} new bot(s).")
+    except Exception as e:
+        logger.error(f"Error processing token file: {e}")
+        await update.message.reply_text("An error occurred while processing the file. Please try again.")
+
 # Utility functions
 async def load_bot_tokens():
     if await aiofiles.os.path.exists(BOT_TOKENS_FILE):
         try:
             async with aiofiles.open(BOT_TOKENS_FILE, 'r', encoding='utf-8') as f:
                 content = await f.read()
-                tokens = []
-                for line in content.splitlines():
-                    parts = line.strip().split(', ')
-                    if parts and parts[0].startswith('Bot token:'):
-                        token = parts[0].split(': ', 1)[1]
-                        tokens.append(token)
-                return tokens
-        except UnicodeDecodeError:
-            # If UTF-8 fails, try with 'latin-1' encoding
-            async with aiofiles.open(BOT_TOKENS_FILE, 'r', encoding='latin-1') as f:
-                content = await f.read()
-                tokens = []
-                for line in content.splitlines():
-                    parts = line.strip().split(', ')
-                    if parts and parts[0].startswith('Bot token:'):
-                        token = parts[0].split(': ', 1)[1]
-                        tokens.append(token)
-                return tokens
+                return [line.strip() for line in content.split('\n') if line.strip()]
         except Exception as e:
             logger.error(f"Error loading bot tokens: {e}")
-            return []
     return []
 
 async def save_bot_tokens():
     try:
         async with aiofiles.open(BOT_TOKENS_FILE, 'w', encoding='utf-8') as f:
             for bot in running_bots:
-                await f.write(f"Bot token: {bot['token']}, Name: {bot['name']}, Username: {bot['username']}\n")
+                await f.write(f"{bot['token']}\n")
         logger.info(f"Saved {len(running_bots)} bot tokens to {BOT_TOKENS_FILE}")
     except Exception as e:
         logger.error(f"Error saving bot tokens: {e}")
@@ -344,6 +370,28 @@ def global_exception_handler(loop, context):
     logger.error(f"Unhandled exception: {exception}")
     logger.error(f"Exception context: {context}")
 
+async def free_cache_memory():
+    collected = gc.collect()
+    logger.info(f"Garbage collector: collected {collected} objects.")
+    
+    try:
+        import ctypes
+        libc = ctypes.CDLL("libc.so.6")
+        libc.malloc_trim(0)
+        logger.info("Called malloc_trim(0) to release memory to the system.")
+    except Exception as e:
+        logger.warning(f"Failed to call malloc_trim: {e}")
+    
+    try:
+        import resource
+        rusage_denom = 1024.0
+        if sys.platform == 'darwin':
+            rusage_denom = rusage_denom * rusage_denom
+        max_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / rusage_denom
+        logger.info(f"Current memory usage: {max_rss:.2f} MB")
+    except Exception as e:
+        logger.warning(f"Failed to get memory usage: {e}")
+
 async def main():
     global running_bots
     tokens = await load_bot_tokens()
@@ -359,6 +407,7 @@ async def main():
     personal_app.add_handler(CommandHandler("stats", stats_command))
     personal_app.add_handler(CommandHandler("list_bots", list_running_bots))
     personal_app.add_handler(CommandHandler("status", status_check))
+    personal_app.add_handler(CommandHandler("add_token_file", add_token_file))
     personal_app.add_error_handler(global_error_handler)
     
     try:
@@ -383,6 +432,9 @@ async def main():
             else:
                 logger.error("Bot checking task has stopped unexpectedly")
                 check_task = asyncio.create_task(check_and_reconnect_bots())
+            
+            # Periodically free cache memory
+            await free_cache_memory()
     except asyncio.CancelledError:
         logger.info("Main loop was cancelled")
     except Exception as e:
