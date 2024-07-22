@@ -205,18 +205,22 @@ async def status_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(status_message)
 
 async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.document is None:
-        await update.message.reply_text("Please upload a text file containing bot tokens.")
+    # Check if the command is a reply to a file
+    if not update.message.reply_to_message or not update.message.reply_to_message.document:
+        await update.message.reply_text("Please use this command as a reply to a text file containing bot tokens.")
         return
 
-    file = await context.bot.get_file(update.message.document.file_id)
+    file = await context.bot.get_file(update.message.reply_to_message.document.file_id)
     
+    await update.message.reply_text("Processing your token file. Please wait...")
+
     try:
         async with aiofiles.tempfile.NamedTemporaryFile(mode='wb', delete=False) as temp_file:
             await file.download_to_memory(temp_file)
             temp_file_path = temp_file.name
 
         new_tokens = await load_bot_tokens(temp_file_path)
+        logger.info(f"Loaded {len(new_tokens)} tokens from the file.")
 
         await aiofiles.os.remove(temp_file_path)
 
@@ -230,10 +234,15 @@ async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 app = await initialize_bot(token)
                 if app:
                     added_count += 1
+                    logger.info(f"Successfully initialized bot with token {token[:10]}...")
+                else:
+                    logger.warning(f"Failed to initialize bot with token {token[:10]}...")
 
-        await save_bot_tokens()
+        if added_count > 0:
+            await save_bot_tokens()
+            logger.info(f"Saved {added_count} new tokens permanently.")
         
-        await update.message.reply_text(f"Successfully added and started {added_count} new bot(s).")
+        await update.message.reply_text(f"Successfully added and started {added_count} new bot(s) out of {len(new_tokens)} tokens.")
     except Exception as e:
         logger.error(f"Error processing token file: {e}")
         await update.message.reply_text("An error occurred while processing the file. Please try again.")
