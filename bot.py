@@ -16,35 +16,45 @@ import csv
 import psutil
 import gc
 import sys
-import resource
+import platform
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Import resource module only on non-Windows platforms
+if platform.system() != 'Windows':
+    import resource
+
+def escape_markdown_v2(text):
+    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for char in special_chars:
+        text = text.replace(char, f'\\{char}')
+    return text
+
 # Constants
-CUSTOM_MESSAGE = r"""
+CUSTOM_MESSAGE = escape_markdown_v2("""
 ══════⊹⊱≼≽⊰⊹══════
-*@NeonGhost\_Networks* Search & Download Your Favourite Movies 👇👇🆓
+*@NeonGhost_Networks* Search & Download Your Favourite Movies 👇👇🆓
 [Link 1](https://t.me/+nwrDN5k69ow0MWRl) [Link 2](https://t.me/+nwrDN5k69ow0MWRl)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
 Leak Viral Video MMS OYO P0rn 🚨👇👇🆓
-[Link 1](https://t\.me/\+XNvgEn\-PVqE1ZmU8) [Link 2](https://t\.me/\+XNvgEn\-PVqE1ZmU8)
+[Link 1](https://t.me/+XNvgEn-PVqE1ZmU8) [Link 2](https://t.me/+XNvgEn-PVqE1ZmU8)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
 TeraBox Viral Video Links🔗🍑👇👇
-[Link 1](https://t\.me/\+vgOaudZKle0zNmE0) [Link 2](https://t\.me/\+vgOaudZKle0zNmE0)
+[Link 1](https://t.me/+vgOaudZKle0zNmE0) [Link 2](https://t.me/+vgOaudZKle0zNmE0)
 ══════⊹⊱≼≽⊰⊹══════
 ══════⊹⊱≼≽⊰⊹══════
 TeraBox Video Downloader Bot 🎥🍿👇👇
-[Link 1](https://t\.me/TeraBox\_Download3r\_Bot) [Link 2](https://t\.me/TeraBox\_Download3r\_Bot)
+[Link 1](https://t.me/TeraBox_Download3r_Bot) [Link 2](https://t.me/TeraBox_Download3r_Bot)
 ══════⊹⊱≼≽⊰⊹══════
-For More: \- *@NeonGhost\_Networks*
-"""
+For More: - *@NeonGhost_Networks*
+""")
 
-NOTIFICATION_BOT_TOKEN = 'YOUR_BOT_TOKEN'
-NOTIFICATION_CHAT_ID = 'YOUR_CHAT_ID'
+NOTIFICATION_BOT_TOKEN = '6836105234:AAFYHYLpQrecJGMVIRJHraGnHTbcON3pxxU'
+NOTIFICATION_CHAT_ID = '-1002177330851'
 BOT_TOKENS_FILE = 'bot_tokens.txt'
 
 # Global variables
@@ -206,10 +216,7 @@ async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await file.download_to_memory(temp_file)
             temp_file_path = temp_file.name
 
-        new_tokens = []
-        async with aiofiles.open(temp_file_path, 'r') as f:
-            content = await f.read()
-            new_tokens = [line.strip() for line in content.split('\n') if line.strip()]
+        new_tokens = await load_bot_tokens(temp_file_path)
 
         await aiofiles.os.remove(temp_file_path)
 
@@ -232,12 +239,15 @@ async def add_token_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("An error occurred while processing the file. Please try again.")
 
 # Utility functions
-async def load_bot_tokens():
-    if await aiofiles.os.path.exists(BOT_TOKENS_FILE):
+async def load_bot_tokens(file_path=BOT_TOKENS_FILE):
+    if await aiofiles.os.path.exists(file_path):
         try:
-            async with aiofiles.open(BOT_TOKENS_FILE, 'r', encoding='utf-8') as f:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
                 content = await f.read()
-                return [line.strip() for line in content.split('\n') if line.strip()]
+                # Use regex to find patterns that look like bot tokens
+                token_pattern = r'\b(?:\d+:[\w-]{35})\b'
+                tokens = re.findall(token_pattern, content)
+                return list(set(tokens))  # Remove duplicates
         except Exception as e:
             logger.error(f"Error loading bot tokens: {e}")
     return []
@@ -376,19 +386,20 @@ async def free_cache_memory():
     
     try:
         import ctypes
-        libc = ctypes.CDLL("libc.so.6")
-        libc.malloc_trim(0)
-        logger.info("Called malloc_trim(0) to release memory to the system.")
+        if platform.system() == 'Windows':
+            ctypes.windll.kernel32.SetProcessWorkingSetSize(-1, -1)
+            logger.info("Called SetProcessWorkingSetSize to release memory to the system.")
+        else:
+            libc = ctypes.CDLL("libc.so.6")
+            libc.malloc_trim(0)
+            logger.info("Called malloc_trim(0) to release memory to the system.")
     except Exception as e:
-        logger.warning(f"Failed to call malloc_trim: {e}")
+        logger.warning(f"Failed to call memory release function: {e}")
     
     try:
-        import resource
-        rusage_denom = 1024.0
-        if sys.platform == 'darwin':
-            rusage_denom = rusage_denom * rusage_denom
-        max_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / rusage_denom
-        logger.info(f"Current memory usage: {max_rss:.2f} MB")
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        logger.info(f"Current memory usage: {memory_info.rss / (1024 * 1024):.2f} MB")
     except Exception as e:
         logger.warning(f"Failed to get memory usage: {e}")
 
