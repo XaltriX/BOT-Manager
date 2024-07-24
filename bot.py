@@ -95,6 +95,17 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(stats_message)
 
+async def list_bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not shared_state.running_bots:
+        await update.message.reply_text("No bots are currently running.")
+        return
+
+    bot_list = "Running Bots:\n\n"
+    for token, bot_data in shared_state.running_bots.items():
+        bot_list += f"Name: {bot_data['name']}\nUsername: @{bot_data['username']}\n\n"
+
+    await update.message.reply_text(bot_list)
+
 async def send_notification(message):
     try:
         if shared_state.main_bot:
@@ -154,6 +165,7 @@ async def initialize_bot(token, is_main_bot=False):
         if is_main_bot:
             app.add_handler(CommandHandler("stats", stats))
             app.add_handler(CommandHandler("add_token_file", add_token_file))
+            app.add_handler(CommandHandler("list_bots", list_bots))
             shared_state.main_bot = app.bot
         
         await app.initialize()
